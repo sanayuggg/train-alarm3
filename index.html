@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>降車アラーム</title>
+</head>
+<body>
+<h1>降車アラーム</h1>
+
+<button id="start">開始</button>
+<p id="status">未開始</p>
+
+<audio id="alarm" src="alarm.mp3"></audio>
+
+<script>
+const status = document.getElementById("status");
+const alarm = document.getElementById("alarm");
+
+document.getElementById("start").onclick = () => {
+  alarm.play(); // ← Safari対策（超重要）
+  status.textContent = "位置情報取得中…";
+
+  navigator.geolocation.watchPosition(pos => {
+    status.textContent = "動作中";
+    navigator.vibrate([200,100,200]);
+    alarm.play();
+  });
+};
+</script>
+</body>
+</html>
