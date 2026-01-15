@@ -3,149 +3,118 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>降車アラーム（音＋振動）</title>
+<title>降車アラーム</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; }
-  h1 { font-size: 1.4rem; }
-  label { display: block; margin-top: 12px; }
-  button { margin-top: 16px; padding: 12px 20px; font-size: 1rem; }
-  select, input { padding: 8px; font-size: 1rem; width: 100%; max-width: 360px; }
-  #status { margin-top: 16px; font-weight: bold; }
+  body { font-family: sans-serif; padding: 20px; text-align: center; }
+  h1 { font-size: 1.6rem; }
+  select, input, button { font-size: 1rem; padding: 8px; margin-top: 10px; }
+  button { width: 80%; max-width: 300px; border-radius: 10px; }
+  #status { margin-top: 15px; font-weight: bold; }
+  #stationStatus { margin-top: 10px; font-size: 1.1rem; }
 </style>
 </head>
 <body>
 
-<h1>🚉 降車アラーム（音＋振動）</h1>
-<p>開始ボタンを押すと、駅に近づいたとき<strong>音と振動</strong>で通知します。</p>
+<h1>🚃 降車アラーム</h1>
+<p>駅を選んで「開始」を押すだけ</p>
+
+<select id="stationSelect">
+  <option value="">駅を選択</option>
+  <option value="35.681236,139.767125">東京駅</option>
+  <option value="35.689592,139.700413">新宿駅</option>
+  <option value="35.658034,139.701636">渋谷駅</option>
+  <option value="35.642131,139.668556">三軒茶屋駅</option>
+</select>
+
+<br />
 
 <label>
-  駅を選択:
-  <select id="stationSelect">
-    <option value="">駅を選択</option>
-    <option value="35.681236,139.767125">東京駅</option>
-    <option value="35.689592,139.700413">新宿駅</option>
-    <option value="35.658034,139.701636">渋谷駅</option>
-    <option value="35.712056,139.773021">上野駅</option>
-    <option value="35.728926,139.71038">池袋駅</option>
-    <option value="35.642131,139.668556">三軒茶屋駅</option>
-  </select>
+  通知距離（m）<br />
+  <input type="number" id="distance" value="300" min="100" max="1000" />
 </label>
 
-<label>
-  到着通知距離（m）:
-  <input type="number" id="distance" value="300" min="50" max="2000" />
-</label>
+<br />
 
-<button id="startBtn">▶ 開始（音ON）</button>
+<button id="startBtn">▶ 開始</button><br />
 <button id="stopBtn">■ 停止</button>
 
-<p id="status">待機中</p>
+<p id="stationStatus"></p>
+<p id="status"></p>
 
-<!-- 音ファイル（index.html と同じ場所に alarm.mp3 を置く） -->
-<audio id="alarmSound" preload="auto">
-  <source src="alarm.mp3" type="audio/mpeg" />
-</audio>
+<audio id="alarm" src="Clock-Alarm05-1(Mid).mp3" loop></audio>
 
 <script>
 let watchId = null;
+const alarm = document.getElementById("alarm");
 
 function updateStatus(text) {
-  document.getElementById('status').innerText = text;
+  document.getElementById("status").innerText = text;
+}
+
+function updateStation(text) {
+  document.getElementById("stationStatus").innerText = text;
 }
 
 function calcDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
-  const toRad = x => x * Math.PI / 180;
+  const toRad = (x) => x * Math.PI / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
 }
 
-function vibrateAlarm() {
-  if (navigator.vibrate) {
-    navigator.vibrate([300, 200, 300]);
-  }
+function notify() {
+  alarm.play().catch(()=>{});
+  if (navigator.vibrate) navigator.vibrate([500,300,500]);
 }
 
-function playAlarm() {
-  const audio = document.getElementById('alarmSound');
-  if (!audio) return;
-  audio.currentTime = 0;
-  audio.play().catch(() => {});
-}
-
-// 開始
-
-document.getElementById('startBtn').onclick = () => {
+startBtn.onclick = () => {
   if (!navigator.geolocation) {
-    alert('このブラウザでは位置情報が使えません');
+    alert("位置情報が使えません");
     return;
   }
 
-  const stationVal = document.getElementById('stationSelect').value;
+  const selectEl = document.getElementById("stationSelect");
+  const stationVal = selectEl.value;
   if (!stationVal) {
-    alert('駅を選択してください');
+    alert("駅を選択してください");
     return;
   }
 
-  // ★ ここで一度音を鳴らして「音の使用許可」を取る
-  playAlarm();
+  const stationName = selectEl.options[selectEl.selectedIndex].text;
+  updateStation(`目的地：${stationName}`);
 
   const [lat, lng] = stationVal.split(',').map(Number);
-  const limit = Number(document.getElementById('distance').value) || 300;
+  const limit = Number(document.getElementById("distance").value) || 300;
 
-  updateStatus('測位中…');
+  updateStatus("位置情報取得中…");
 
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-  }
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
-  watchId = navigator.geolocation.watchPosition(
-    pos => {
-      const d = calcDistance(
-        pos.coords.latitude,
-        pos.coords.longitude,
-        lat,
-        lng
-      );
+  watchId = navigator.geolocation.watchPosition(pos => {
+    const d = calcDistance(pos.coords.latitude, pos.coords.longitude, lat, lng);
+    updateStatus(`残り ${Math.round(d)} m`);
 
-      updateStatus(`現在地との距離: ${d.toFixed(0)} m`);
-
-      // 300〜1000m の間は鳴り続ける
-      if (d > 300 && d < 1000) {
-        vibrateAlarm();
-        playAlarm();
-      }
-
-      // 到着
-      if (d <= limit) {
-        vibrateAlarm();
-        playAlarm();
-        alert('目的地付近に到着しました！');
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        updateStatus('到着しました');
-      }
-    },
-    err => {
-      alert('位置情報を取得できません');
-      updateStatus('エラー');
-      console.error(err);
-    },
-    { enableHighAccuracy: true }
-  );
+    if (d <= limit) {
+      notify();
+      alert(`${stationName} に到着！`);
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      updateStatus("到着しました");
+    }
+  }, err => {
+    alert("位置情報を取得できません");
+  }, { enableHighAccuracy: true });
 };
 
-// 停止
-
-document.getElementById('stopBtn').onclick = () => {
-  if (watchId !== null) {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-  }
-  updateStatus('停止しました');
+stopBtn.onclick = () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  alarm.pause();
+  alarm.currentTime = 0;
+  updateStatus("停止しました");
 };
 </script>
 
